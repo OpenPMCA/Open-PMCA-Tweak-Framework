@@ -1,0 +1,48 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 7
+}
+
+def fixtureTypes = [
+    'valid', 'throwing', 'empty', 'no_methods', 'generic_android',
+    'coexist_scalar_empty', 'wrong_types', 'static_init_failure',
+    'missing_get_string', 'missing_get_firmware', 'model_failure', 'missing_sdk_int',
+    'method_linkage_failure',
+    'instance_string', 'instance_firmware', 'instance_model', 'instance_sdk'
+]
+
+fixtureTypes.each { type ->
+    def folderName = type.replace('_', '-')
+    sourceSets.create("fixtures_${type}") {
+        java {
+            srcDir "src/testFixtures/${folderName}/java"
+        }
+    }
+}
+
+tasks.named('test') {
+    enabled = false
+}
+
+tasks.register('hostTest', JavaExec) {
+    dependsOn testClasses
+    fixtureTypes.each { type ->
+        dependsOn tasks.named("compileFixtures_${type}Java")
+    }
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'org.openpmca.framework.PmcaRuntimeHostTest'
+    systemProperty 'openpmca.test.fixtures.baseDir', layout.buildDirectory.dir('classes/java').get().asFile.absolutePath
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('hostTest')
+}
